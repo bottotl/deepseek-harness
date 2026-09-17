@@ -1,0 +1,25 @@
+apps/desktop/scripts/prepare-runtime.ts
+  s_4aed910e5ac44c::t_813f75a2d20258 65
+apps/desktop/README.i18n.yaml
+  s_4aed910e5ac44c::t_68eaa2f125a2bc 5-6
+apps/desktop/README.md
+  s_4aed910e5ac44c::t_498f45b74d7828 185
+apps/desktop/README.zh.md
+  s_4aed910e5ac44c::t_0f5c43ed270a65 185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a871eb70d02ad68e224f4aebff5c4c488f2ea3d4",
+  "prompts": {},
+  "sessions": {
+    "s_4aed910e5ac44c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0afc5-403e-7c50-aeea-6e63c0939e03",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "於林涛 <yulintao3@jd.com>"
+    }
+  }
+}
