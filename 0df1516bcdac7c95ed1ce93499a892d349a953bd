@@ -1,0 +1,23 @@
+packages/api/gateway/README.i18n.yaml
+  s_4aed910e5ac44c::t_35b23bc14b1030 5-6
+packages/api/gateway/README.md
+  s_4aed910e5ac44c::t_fe6ff5f089b7f3 27,35,42,44,73
+packages/api/gateway/README.zh.md
+  s_4aed910e5ac44c::t_24361bb5a10de7 27,35,42,44,73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0df1516bcdac7c95ed1ce93499a892d349a953bd",
+  "prompts": {},
+  "sessions": {
+    "s_4aed910e5ac44c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0afc5-403e-7c50-aeea-6e63c0939e03",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "於林涛 <yulintao3@jd.com>"
+    }
+  }
+}

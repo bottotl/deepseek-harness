@@ -1,0 +1,33 @@
+.agents/notes/implemented/bug-fix/2026-09-18-loader-nested-removal.i18n.yaml
+  s_4aed910e5ac44c::t_cdcfccabb7eb8b 1-6
+.agents/notes/implemented/bug-fix/2026-09-18-loader-nested-removal.md
+  s_4aed910e5ac44c::t_de0a3a9a1194f4 1-21
+.agents/notes/implemented/bug-fix/2026-09-18-loader-nested-removal.zh.md
+  s_4aed910e5ac44c::t_818e22e1510d99 1-21
+packages/boot/app-boot/tests/config-reload.spec.ts
+  s_4aed910e5ac44c::t_91105c5d79d73f 42-78
+packages/experimental/webworker-packer/tests/image-loadable.spec.ts
+  s_4aed910e5ac44c::t_dbbf10f6cb28cf 307-310
+vendor/README.md
+  s_4aed910e5ac44c::t_5b96249da22a52 53-54
+vendor/loader/README.md
+  s_4aed910e5ac44c::t_612c7bd5f68bd7 42
+vendor/loader/src/config/tree.ts
+  s_4aed910e5ac44c::t_9edd1339552074 92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c8a56e0206a60748c4dae295c81f85c8917cbcd9",
+  "prompts": {},
+  "sessions": {
+    "s_4aed910e5ac44c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0afc5-403e-7c50-aeea-6e63c0939e03",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "於林涛 <yulintao3@jd.com>"
+    }
+  }
+}
