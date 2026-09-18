@@ -1,0 +1,22 @@
+apps/cli/src/profile-boot.ts
+  h_851b282587dcc2 411-414
+apps/desktop/src/main.ts
+  h_851b282587dcc2 69-70,83-88
+apps/desktop/src/project-manager.ts
+  h_851b282587dcc2 5,21,63-66,95-114,467,472-473,477-479,482,493,534,545-548
+apps/desktop/tests/plugin-pnpm.spec.ts
+  h_851b282587dcc2 34,48-49,51-54
+apps/desktop/tests/project-manager.spec.ts
+  h_851b282587dcc2 7,26-28,56,60,62,64,292-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "70128e2d81e24c13412a0a4913e8b4edbd9cb94a",
+  "prompts": {},
+  "humans": {
+    "h_851b282587dcc2": {
+      "author": "yulintao3 <yulintao3@jd.com>"
+    }
+  }
+}
