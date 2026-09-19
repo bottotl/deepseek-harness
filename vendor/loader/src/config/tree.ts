@@ -89,7 +89,7 @@ export abstract class EntryTree {
   /** Stop and remove an entry from its parent group. */
   remove(id: string) {
     const entry = this.resolve(id)
-    entry.parent.remove(id)
+    entry.parent.remove(entry.options.id)
     entry.parent.tree.write()
   }
 

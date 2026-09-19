@@ -67,6 +67,27 @@ function packedDependencies(directories: readonly string[]): Map<string, { url: 
   return dependencies
 }
 
+/**
+ * Build the clean consumer without promoting the whole release family to
+ * application roots. Local tarballs remain authoritative for every internal
+ * dependency that the entry's real runtime closure reaches.
+ */
+export function packedConsumerManifest(
+  entryPackage: string,
+  packed: ReadonlyMap<string, { url: string; version: string }>,
+): Record<string, unknown> {
+  const entry = packed.get(entryPackage)
+  if (entry === undefined) throw new Error(`${entryPackage} is not among the packed tarballs`)
+  const localTarballs = Object.fromEntries([...packed].map(([name, item]) => [name, item.url]))
+  return {
+    name: 'dsh-packed-install-consumer',
+    version: '0.0.0',
+    private: true,
+    dependencies: { [entryPackage]: entry.url },
+    overrides: localTarballs,
+  }
+}
+
 /** Install every tarball under `--from` and drive the `--family` entry. */
 function main(): void {
   const { values } = parseArgs({
@@ -91,21 +112,20 @@ function main(): void {
 
   const consumerRoot = mkdtempSync(join(tmpdir(), `dsh-packed-${family.id}-`))
   try {
-    writeFileSync(join(consumerRoot, 'package.json'), `${JSON.stringify({
-      name: `dsh-packed-install-${family.id}`,
-      version: '0.0.0',
-      private: true,
-      dependencies: Object.fromEntries([...packed].map(([name, entryPacked]) => [name, entryPacked.url])),
-    }, null, 2)}\n`)
+    writeFileSync(join(consumerRoot, 'package.json'), `${JSON.stringify(
+      packedConsumerManifest(entry.packageName, packed), null, 2,
+    )}\n`)
 
     const environment = consumerEnvironment(consumerRoot)
-    console.log(`release verify-packed-install: installing ${String(packed.size)} tarball(s) into ${consumerRoot}`)
+    console.log(`release verify-packed-install: installing ${entry.packageName} with ${String(packed.size)} local tarball override(s) into ${consumerRoot}`)
     // Optional dependencies are omitted: the Landlock platform packages behind
     // them need a musl toolchain and one build per architecture, and a consumer
     // that cannot install them must still start — which is what optional means
-    // here. Their entry package is a plain dependency of dsh-sandbox-local, so
-    // its tarball is supplied through --from.
-    capture('npm', ['install', '--no-audit', '--no-fund', '--package-lock=false', '--omit=optional', '--loglevel=http'],
+    // here. Install scripts are also outside this payload/closure check: native
+    // execution and rebuilds have target-specific release gates, while running
+    // arbitrary third-party lifecycle scripts here would make this verifier
+    // depend on ambient compilers such as CMake.
+    capture('npm', ['install', '--no-audit', '--no-fund', '--package-lock=false', '--omit=optional', '--ignore-scripts', '--loglevel=http'],
       { cwd: consumerRoot, env: environment })
 
     const installedEntry = join(consumerRoot, 'node_modules', entry.packageName)

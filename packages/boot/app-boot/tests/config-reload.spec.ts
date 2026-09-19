@@ -39,6 +39,43 @@ function entryConfig(ctx: Context, id: string): unknown {
   return [...ctx.loader.entries()].find(entry => entry.options.id === id)?.options.config
 }
 
+describe('nested Loader entry removal', () => {
+  it('removes the resolved child and disposes its effects without removing a same-id sibling', async () => {
+    const { ctx, dir } = await bootTree([
+      '- id: child',
+      '  name: ./noop.mjs',
+      '- id: nested',
+      "  name: 'cordis:include'",
+      '  config: { path: ./nested.yml }',
+      '',
+    ].join('\n'), {
+      'nested.yml': '- id: child\n  name: ./owned.mjs\n',
+      'owned.mjs': [
+        "import { writeFileSync } from 'node:fs'",
+        'export function apply(ctx) {',
+        "  ctx.effect(() => () => writeFileSync(new URL('./disposed.txt', import.meta.url), 'disposed'))",
+        '}',
+        '',
+      ].join('\n'),
+    })
+    try {
+      const children = [...ctx.loader.entries()].filter(entry => entry.options.id === 'child')
+      expect(children).toHaveLength(2)
+      const target = children.find(entry => entry.options.name === './owned.mjs')!
+      const sibling = children.find(entry => entry !== target)!
+      const fiber = target.fiber!
+      ctx.loader.remove(target.id)
+      await fiber.inertia
+      expect([...ctx.loader.entries()]).not.toContain(target)
+      expect(() => ctx.loader.resolve(target.id)).toThrow('cannot resolve entry')
+      expect(ctx.loader.resolve(sibling.id)).toBe(sibling)
+      expect(readFileSync(join(dir, 'disposed.txt'), 'utf8')).toBe('disposed')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
 describe('include refresh with an invalid file', () => {
   it('writes and activates initial entries when an included file is missing', async () => {
     const { ctx, dir } = await bootTree([

@@ -47,6 +47,8 @@ files:
 
 静态消费方直接针对工作区的 `tsconfig.host.json` 与 `tsconfig.client.json` 聚合配置调用 `WorkspaceAnalyzer`，选择 face 与包子集，并在不生成或加载运行时产物的前提下读取生成的 `FaceModel` 与类型图。`analyzeInBatches()` 通过有界的编译器程序处理大批量包选择，模型形态保持一致；`discoverPackages()` 无需构建类型检查程序即可找出参与贡献的包。
 
+Remote 标记按 `@deepseek-ai/dsh-typert-protocol` 的公开导出符号身份解析，包括已安装的声明包。该依赖无需注册为工作区项目，其他包导出的同名装饰器也不会被当作 Remote 标记。[决策记录](../../../.agents/notes/implemented/bug-fix/2026-09-18-installed-remote-protocol-symbols.zh.md) 解释了这一区别。
+
 ### 在 tsdown 构建中运行生成
 
 包的 `./tsdown` 子路径为根 tsdown 配置提供 `typertPlugin()`：它在打包前转换 TypeScript 依赖中的标准装饰器，并在包输出根目录生成模型驱动的 face 产物。`package` 模式只生成当前打包的包；`workspace` 模式对每个显式贡献方各生成一次。
@@ -86,6 +88,8 @@ Host 与 Client 是两个独立的 TypeScript 程序。直接项目引用确定�
 `FaceModelEmitter` 输出包含只缓存成功结果的 Zod schema factory 与 `TYPERT` 贡献的可执行 JavaScript，以及把 factory 通过包的公开导出标注为返回 `z.ZodType<SourceType>` 的声明文件；不支持的 Zod 投影会失败。含 Remote 方法的 Host face 还会额外为 Client 生成 Host Remote 约定的 `typert.remote-client.*` 投影。`WorkspaceTypertGenerator` 校验每个贡献方的 `package.json`：`./typert` 与 `./client/typert`（存在 Remote 方法时还有 `./remote`）必须指向精确的生成文件，且 `files` 清单必须包含它们。
 
 ### 目录投影
+
+运行时类型闭包索引导出的 workspace 声明和被引用的框架 enum。Vendor 声明不参与业务 API 发现；公共结果引用其中 enum 时，目录仍提供其定义。
 
 根导出包含本仓库 Cordis 目录使用的模型驱动提取逻辑、完整性检查与确定性文本渲染器。它们接受 `CordisCatalogPolicy`；由仓库持有的类型链接、基础类型／豁免分类与继承的 Cordis 条目仍位于 `scripts/gen-cordis-catalog.ts`，由调用方显式传入，因此本包只包含投影机制，不会隐式复制仓库的文档分类体系。
 

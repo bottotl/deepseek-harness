@@ -48,6 +48,32 @@ afterEach(() => {
 })
 
 describe('Remote model generation', { timeout: 60_000 }, () => {
+  it('generates Remote descriptors from an installed protocol declaration package', () => {
+    const root = copyFixture()
+    installProtocolDeclarations(root, '@deepseek-ai/dsh-typert-protocol')
+    editFile(root, 'tsconfig.base.json', (source) => {
+      const config = JSON.parse(source) as { compilerOptions: { paths: Record<string, string[]> } }
+      delete config.compilerOptions.paths['@deepseek-ai/dsh-typert-protocol']
+      return JSON.stringify(config)
+    })
+
+    const artifacts = new WorkspaceTypertGenerator(root).generate()
+    expect(artifacts).toHaveLength(1)
+    expect(artifacts[0]?.remote?.js).toContain('goals/create')
+    expect(remotePackage(root).invocations).toHaveLength(3)
+  })
+
+  it('does not recognize another dependency\'s same-name Remote decorator', () => {
+    const root = copyFixture()
+    installProtocolDeclarations(root, '@fixture/other-protocol')
+    editFile(root, 'packages/remote/src/index.ts', source => source.replace(
+      "import { TypertRemoteService, Remote, RemoteScope } from '@deepseek-ai/dsh-typert-protocol'",
+      "import { TypertRemoteService, RemoteScope } from '@deepseek-ai/dsh-typert-protocol'\nimport { Remote } from '@fixture/other-protocol'",
+    ))
+
+    expect(remotePackage(root).invocations.map(invocation => invocation.method)).toEqual(['rename'])
+  })
+
   it('discovers a Remote-only package and emits strict direct and Context descriptors', async () => {
     const generator = new WorkspaceTypertGenerator(fixtureRoot)
 
@@ -607,6 +633,18 @@ export class DuplicateGoalService extends TypertRemoteService {
 
 function analyzeRemote(root: string, checkDiagnostics = true): ReturnType<WorkspaceAnalyzer['analyze']> {
   return new WorkspaceAnalyzer({ root, checkDiagnostics }).analyze()
+}
+
+function installProtocolDeclarations(root: string, name: string): void {
+  const source = readFileSync(join(root, 'typert-protocol.d.ts'), 'utf8')
+  const prefix = "declare module '@deepseek-ai/dsh-typert-protocol' {\n"
+  expect(source.startsWith(prefix)).toBe(true)
+  const directory = join(root, 'node_modules', name)
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({
+    name, version: '0.0.0', type: 'module', exports: { '.': { types: './index.d.ts' } },
+  }))
+  writeFileSync(join(directory, 'index.d.ts'), source.slice(prefix.length, source.lastIndexOf('}')))
 }
 
 function remotePackage(root: string): {
