@@ -30,7 +30,7 @@ afterEach(async () => {
 })
 
 /** Write a dist fixture and the authenticated Web rows, then boot them through the real Loader. */
-async function loadComposition(): Promise<Context> {
+async function loadComposition(spaRoutePrefixes: string[] = []): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-frontend-static-'))
   const dist = join(root, 'dist')
   await mkdir(dist)
@@ -55,6 +55,7 @@ async function loadComposition(): Promise<Context> {
     "  name: '@deepseek-ai/dsh-host-frontend-static'",
     '  config:',
     `    distIndex: '${distIndex}'`,
+    ...(spaRoutePrefixes.length ? ['    spaRoutePrefixes:', ...spaRoutePrefixes.map(prefix => `      - '${prefix}'`)] : []),
     '',
   ].join('\n'))
 
@@ -94,6 +95,33 @@ async function request(port: number, path: string, init?: RequestInit): Promise<
 }
 
 describe('real Loader composition', () => {
+  it('serves only configured HTML navigation paths through authenticated index rendering', { timeout: 60_000 }, async () => {
+    const loaded = await loadComposition(['/workbench', '/workspaces'])
+    const port = loaded.webServer.port
+    const launchUrl = loaded.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`)
+    const exchange = await fetch(launchUrl, { redirect: 'manual' })
+    const setCookie = exchange.headers.get('set-cookie')
+    if (setCookie === null) throw new Error('authenticated frontend did not set a cookie')
+    const cookie = setCookie.split(';', 1)[0]!
+    const navigation = { headers: { accept: 'text/html', cookie } }
+    const path = '/workbench/intake?payload=example'
+
+    expect((await request(port, path, { headers: { accept: 'text/html' } })).status).toBe(401)
+    const page = await request(port, path, navigation)
+    expect(page).toMatchObject({
+      status: 200,
+      type: 'text/html; charset=utf-8',
+    })
+    expect(page.body).toContain('<base href="/">')
+    expect(page.body).toContain('shell')
+    expect((await request(port, '/workspaces/ws-1/flow', navigation)).status).toBe(200)
+    expect(await request(port, '/workbench/missing.js', { headers: { cookie } })).toEqual({ status: 404, type: null, body: '' })
+    expect(await request(port, '/workbench-other', navigation)).toEqual({ status: 404, type: null, body: '' })
+    expect((await request(port, '/api/no/such/route', navigation)).status).toBe(404)
+    expect((await request(port, '/..%2f..%2fworkbench%2fintake', navigation)).status).toBe(403)
+    expect((await request(port, path, { ...navigation, method: 'POST' })).status).toBe(405)
+  })
+
   it('serves explicit index entries and files while preserving HTTP error semantics', { timeout: 60_000 }, async () => {
     const loaded = await loadComposition()
     const unloaded = [...loaded.loader.entries()]

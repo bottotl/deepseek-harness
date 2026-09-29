@@ -1048,10 +1048,12 @@ export interface Config {
 需要：`webServer` · `connection`
 
 ```ts config-catalog
-/** Plugin config: the dist anchor. */
+/** Plugin config: the dist anchor and optional SPA navigation paths. */
 export interface Config {
   /** Absolute path of index.html inside the dist root. */
   distIndex: string
+  /** Absolute pathname prefixes whose HTML navigations render the authenticated index. */
+  spaRoutePrefixes?: string[]
 }
 ```
 
