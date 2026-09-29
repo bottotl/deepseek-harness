@@ -1,0 +1,35 @@
+docs/config-catalog.zh.md
+  s_e664dd8186d2f0::t_92695e85ed2b92 1051,1055-1056
+packages/host/frontend-static/README.i18n.yaml
+  s_e664dd8186d2f0::t_2522f4d59f34dd 5-6
+packages/host/frontend-static/src/index.ts
+  s_e664dd8186d2f0::t_cce667e03f9cd9 4-5,29,33-34,39,72-74,80-81,95-97,125-130,156-157
+docs/config-catalog.i18n.yaml
+  s_e664dd8186d2f0::t_2522f4d59f34dd 5-6
+packages/host/frontend-static/README.zh.md
+  s_e664dd8186d2f0::t_6806200a6ccd79 12,28,40-41,44,46,50,107
+docs/config-catalog.md
+  s_e664dd8186d2f0::t_cde63ad0bf54e6 1049,1053-1054
+packages/host/frontend-static/README.md
+  s_e664dd8186d2f0::t_24250bbc2fd9c8 12,28,40-41,44,46,50,107
+packages/host/frontend-static/tests/frontend-static.spec.ts
+  s_e664dd8186d2f0::t_e503f950008fa9 33,98-109,112-114,117-124
+  s_e664dd8186d2f0::t_7bf748c34915d4 58
+  s_e664dd8186d2f0::t_3c3695110728cc 110-111,115-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0542afa4f2370e31561bfe153cf0751abead1341",
+  "prompts": {},
+  "sessions": {
+    "s_e664dd8186d2f0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ec87-07df-7ac0-8ff2-6e99ce0683bd",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "yulintao3 <yulintao3@jd.com>"
+    }
+  }
+}
