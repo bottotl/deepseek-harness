@@ -1,0 +1,51 @@
+docs/config-catalog.i18n.yaml
+  s_955ffb4f3bd8bf::t_8daaee4c41daaa 5-6
+docs/config-catalog.md
+  s_955ffb4f3bd8bf::t_5f3ccdca0be279 114
+docs/config-catalog.zh.md
+  s_955ffb4f3bd8bf::t_b1ef8c83f3a8e8 116
+docs/event-producer-consumer.i18n.yaml
+  s_955ffb4f3bd8bf::t_587867358923d6 5-6
+docs/event-producer-consumer.md
+  s_955ffb4f3bd8bf::t_9aa66f4d1a5f0b 10
+docs/event-producer-consumer.zh.md
+  s_955ffb4f3bd8bf::t_cf2ed79201e0f5 12
+packages/core/agent-loop/README.i18n.yaml
+  s_955ffb4f3bd8bf::t_b43f26f222b499 5-6
+packages/core/agent-loop/README.md
+  s_955ffb4f3bd8bf::t_891612eaf30fc8 63-64
+packages/core/agent-loop/README.zh.md
+  s_955ffb4f3bd8bf::t_b62b0a612f16a4 63-64
+packages/core/agent-loop/src/index.ts
+  s_955ffb4f3bd8bf::t_d11510167f436c 17,800,818,834,837-841,853-863,949
+packages/core/agent-loop/tests/resume.spec.ts
+  s_955ffb4f3bd8bf::t_ac0b9c5a21355e 315-346,750,757,765,777-804
+packages/core/agent-loop/tests/scope-lifecycle.spec.ts
+  s_955ffb4f3bd8bf::t_e8a2982f1906ec 64-104
+packages/core/agent/README.i18n.yaml
+  s_955ffb4f3bd8bf::t_7bdf2c57c42af7 5-6
+packages/core/agent/README.md
+  s_955ffb4f3bd8bf::t_d0c2831d5969cd 34-35
+packages/core/agent/README.zh.md
+  s_955ffb4f3bd8bf::t_cbd8eccf243784 34-35
+packages/core/agent/src/index.ts
+  s_955ffb4f3bd8bf::t_21455fa3453d21 55-66,131-132,158-159
+packages/extensions/tool-cordis/src/api-catalog.ts
+  s_955ffb4f3bd8bf::t_e02f8d70a73cde 4015-4022,4493,5585
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f8ab1fb5a9e2ea2e8d20374629e6668ccd12dc57",
+  "prompts": {},
+  "sessions": {
+    "s_955ffb4f3bd8bf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a101b0-7711-7651-a44f-b049d1704cb2",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "yulintao3 <yulintao3@jd.com>"
+    }
+  }
+}
