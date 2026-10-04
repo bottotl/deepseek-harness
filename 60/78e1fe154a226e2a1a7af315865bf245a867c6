@@ -1,0 +1,31 @@
+docs/architecture.i18n.yaml
+  s_955ffb4f3bd8bf::t_0c16a20b3aac4e 5-6
+docs/architecture.md
+  s_955ffb4f3bd8bf::t_99b68d5bc1c08e 80
+docs/architecture.zh.md
+  s_955ffb4f3bd8bf::t_443a35e63cbd56 82
+docs/subsystems/core.i18n.yaml
+  s_955ffb4f3bd8bf::t_6e7d82dbffd08d 5-6
+docs/subsystems/core.md
+  s_955ffb4f3bd8bf::t_aaf9c03fd869a4 51-52
+docs/subsystems/core.zh.md
+  s_955ffb4f3bd8bf::t_35a596914d98f5 53-54
+packages/core/agent/src/index.ts
+  s_955ffb4f3bd8bf::t_5e0f0e4f63811e 64-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6078e1fe154a226e2a1a7af315865bf245a867c6",
+  "prompts": {},
+  "sessions": {
+    "s_955ffb4f3bd8bf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a101b0-7711-7651-a44f-b049d1704cb2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "yulintao3 <yulintao3@jd.com>"
+    }
+  }
+}
