@@ -53,6 +53,20 @@ export type AgentSetup = (
   agent: Agent,
 ) => AgentSetupCommit | Promise<AgentSetupCommit | void> | void
 
+/** Result emitted only after a prepared initialization has awaited its owned teardown. */
+export type AgentInitializationRollback =
+  | { readonly sessionId: SessionId; readonly status: 'completed' }
+  | { readonly sessionId: SessionId; readonly status: 'failed'; readonly cleanupError: unknown }
+
+/**
+ * Observe prepared initialization rollback without replacing its primary failure.
+ * Absence of this notification is not proof of teardown. This is a same-process
+ * ownership result, not a persisted session event or a normal handle disposal.
+ * Returned promises are not awaited; their rejections are contained. Asynchronous
+ * observer work can continue after the caller receives the primary failure.
+ */
+export type AgentInitializationRollbackObserver = (result: AgentInitializationRollback) => void | Promise<void>
+
 /**
  * Options for programmatically creating an agent through the registry factory
  * ({@link AgentRegistry.create}). The caller supplies the single live
@@ -116,6 +130,8 @@ export interface CreateAgentOptions {
    * than a runtime restriction. Drive the agent only after creation resolves.
    */
   readonly setup?: AgentSetup
+  /** Called after prepared initialization rollback settles; observer errors never replace the primary failure. */
+  readonly onInitializationRollback?: AgentInitializationRollbackObserver
 }
 
 /**
@@ -141,6 +157,8 @@ export interface ResumeAgentOptions {
    * or owner disposal rolls the transaction back without publishing either id.
    */
   readonly setup?: AgentSetup
+  /** Called after prepared initialization rollback settles; observer errors never replace the primary failure. */
+  readonly onInitializationRollback?: AgentInitializationRollbackObserver
 }
 
 /**

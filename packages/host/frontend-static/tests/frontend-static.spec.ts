@@ -7,6 +7,7 @@
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -30,7 +31,7 @@ afterEach(async () => {
 })
 
 /** Write a dist fixture and the authenticated Web rows, then boot them through the real Loader. */
-async function loadComposition(): Promise<Context> {
+async function loadComposition(spaRoutePrefixes: string[] = []): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-frontend-static-'))
   const dist = join(root, 'dist')
   await mkdir(dist)
@@ -55,6 +56,7 @@ async function loadComposition(): Promise<Context> {
     "  name: '@deepseek-ai/dsh-host-frontend-static'",
     '  config:',
     `    distIndex: '${distIndex}'`,
+    ...(spaRoutePrefixes.length ? ['    spaRoutePrefixes:', ...spaRoutePrefixes.map(prefix => `      - '${prefix}'`)] : []),
     '',
   ].join('\n'))
 
@@ -94,6 +96,40 @@ async function request(port: number, path: string, init?: RequestInit): Promise<
 }
 
 describe('real Loader composition', () => {
+  it('rejects broad or malformed SPA route prefixes before claiming a fallback seat', () => {
+    for (const prefix of ['/', '/workbench/', 'workbench', '/workbench/../api']) {
+      expect(() => FrontendStatic.apply(new Context(), { distIndex: '/tmp/index.html', spaRoutePrefixes: [prefix] }))
+        .toThrow(`invalid SPA route prefix: ${prefix}`)
+    }
+  })
+
+  it('serves only configured HTML navigation paths through authenticated index rendering', { timeout: 60_000 }, async () => {
+    const loaded = await loadComposition(['/workbench', '/workspaces'])
+    const port = loaded.webServer.port
+    const launchUrl = loaded.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`)
+    const exchange = await fetch(launchUrl, { redirect: 'manual' })
+    const setCookie = exchange.headers.get('set-cookie')
+    if (setCookie === null) throw new Error('authenticated frontend did not set a cookie')
+    const cookie = setCookie.split(';', 1)[0]!
+    const navigation = { headers: { accept: 'text/html', cookie } }
+    const path = '/workbench/intake?payload=example'
+
+    expect((await request(port, path, { headers: { accept: 'text/html' } })).status).toBe(401)
+    const page = await request(port, path, navigation)
+    expect(page).toMatchObject({
+      status: 200,
+      type: 'text/html; charset=utf-8',
+    })
+    expect(page.body).toContain('<base href="/">')
+    expect(page.body).toContain('shell')
+    expect((await request(port, '/workspaces/ws-1/flow', navigation)).status).toBe(200)
+    expect(await request(port, '/workbench/missing.js', { headers: { cookie } })).toEqual({ status: 404, type: null, body: '' })
+    expect(await request(port, '/workbench-other', navigation)).toEqual({ status: 404, type: null, body: '' })
+    expect((await request(port, '/api/no/such/route', navigation)).status).toBe(404)
+    expect((await request(port, '/..%2f..%2fworkbench%2fintake', navigation)).status).toBe(403)
+    expect((await request(port, path, { ...navigation, method: 'POST' })).status).toBe(405)
+  })
+
   it('serves explicit index entries and files while preserving HTTP error semantics', { timeout: 60_000 }, async () => {
     const loaded = await loadComposition()
     const unloaded = [...loaded.loader.entries()]
@@ -215,5 +251,77 @@ describe('real Loader composition', () => {
     await frontendEntry!.fiber?.dispose()
     expect((await request(port, '/no/such/route')).status).toBe(404)
     expect(() => server.registerFallback(() => {})).not.toThrow()
+  })
+})
+
+describe('SPA fallback without a listening socket', () => {
+  it('renders only exact or descendant HTML routes after authorization', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-spa-source-'))
+    try {
+      const index = join(directory, 'index.html')
+      await writeFile(index, '<head></head><body>shell</body>')
+      const responses: Array<{ status: number; body: string | Buffer }> = []
+      const modes: boolean[] = []
+      let authorized = false
+      const response = {
+        writeHead(status: number) { responses.push({ status, body: '' }); return this },
+        end(body: string | Buffer = '') { responses.at(-1)!.body = body; return this },
+      } as unknown as ServerResponse
+      const serve = async (pathname: string, acceptsHtml: boolean) => FrontendStatic.serveStatic(
+        pathname, response, directory, index, () => authorized,
+        async (spaNavigation) => { modes.push(spaNavigation); return spaNavigation ? '<base href="/">shell' : '<base href="./">shell' },
+        ['/workbench'], acceptsHtml,
+      )
+
+      await serve('/workbench/flow', true)
+      expect(responses).toEqual([])
+      authorized = true
+      await serve('/workbench/flow', true)
+      await serve('/workbench', true)
+      await serve('/workbench/flow', false)
+      await serve('/workbench-other', true)
+      await serve('/', true)
+      expect(modes).toEqual([true, true, false])
+      expect(responses).toEqual([
+        { status: 200, body: '<base href="/">shell' },
+        { status: 200, body: '<base href="/">shell' },
+        { status: 404, body: '' },
+        { status: 404, body: '' },
+        { status: 200, body: '<base href="./">shell' },
+      ])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('uses an absolute asset base only for SPA navigation in the actual fallback seat', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-spa-seat-'))
+    try {
+      const index = join(directory, 'index.html')
+      await writeFile(index, '<head></head><body>shell</body>')
+      let fallback: ((request: IncomingMessage, response: ServerResponse) => Promise<void>) | undefined
+      const context = {
+        effect(register: () => void) { register() },
+        webServer: {
+          registerFallback(handler: typeof fallback) { fallback = handler },
+          renderIndex(html: string) { return html },
+        },
+        connection: { authorizeIndex() { return true } },
+      } as unknown as Context
+      FrontendStatic.apply(context, { distIndex: index, spaRoutePrefixes: ['/workbench'] })
+      const response = async (url: string) => {
+        let body = ''
+        const output = {
+          writeHead() { return this },
+          end(text: string = '') { body = text; return this },
+        } as unknown as ServerResponse
+        await fallback!({ method: 'GET', url, headers: { accept: 'text/html' } } as IncomingMessage, output)
+        return body
+      }
+      expect(await response('/workbench/flow')).toContain('<base href="/">')
+      expect(await response('/')).toContain('<base href="./">')
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 })

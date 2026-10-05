@@ -15,6 +15,7 @@ import type {
   Agent,
   AgentFactory,
   AgentHandle,
+  AgentInitializationRollbackObserver,
   AgentOptions,
   AgentSetup,
   CreateAgentOptions,
@@ -744,6 +745,7 @@ export class AgentLoop extends Service implements AgentFactory {
         'startup',
         stored,
         options.parentAgent,
+        options.onInitializationRollback,
       )
     })()
     this.ownership.trackWrapper(published)
@@ -761,6 +763,7 @@ export class AgentLoop extends Service implements AgentFactory {
     source: SessionStartSource,
     stored?: StoredSession,
     parentAgent?: Agent,
+    onRollback?: AgentInitializationRollbackObserver,
   ): Promise<AgentHandle> {
     using ownedPreparation = preparation
     const session = ownedPreparation.session
@@ -776,10 +779,14 @@ export class AgentLoop extends Service implements AgentFactory {
       setupCommit?.commit()
       await this.appendUnstoredSuffix(stored, session)
       return await prepared.publish(source)
-    })
+    }, onRollback)
   }
 
-  private async initializeAgent(prepared: PreparedAgent, initialize: () => Promise<AgentHandle>): Promise<AgentHandle> {
+  private async initializeAgent(
+    prepared: PreparedAgent,
+    initialize: () => Promise<AgentHandle>,
+    onRollback?: AgentInitializationRollbackObserver,
+  ): Promise<AgentHandle> {
     try {
       return await prepared.agent.runMaintenance(async () => {
         try {
@@ -791,9 +798,17 @@ export class AgentLoop extends Service implements AgentFactory {
         }
       })
     } catch (error: unknown) {
-      // Rollback swallows a disposal rejection (a failing final handle close):
-      // the setup failure is the primary error the caller must see.
-      await prepared.dispose().catch(() => {})
+      // Keep the primary failure while reporting the independent owned teardown result.
+      let result: Parameters<AgentInitializationRollbackObserver>[0]
+      try {
+        await prepared.dispose()
+        result = { sessionId: prepared.agent.id, status: 'completed' }
+      } catch (cleanupError: unknown) {
+        result = { sessionId: prepared.agent.id, status: 'failed', cleanupError }
+      }
+      try {
+        void Promise.resolve(onRollback?.(Object.freeze(result))).catch(() => {})
+      } catch { /* The observer does not own the primary failure. */ }
       throw error
     }
   }
@@ -879,6 +894,7 @@ export class AgentLoop extends Service implements AgentFactory {
           'resume',
           owned,
           options.parentAgent,
+          options.onInitializationRollback,
         )
       } finally {
         preparation?.[Symbol.dispose]()

@@ -61,6 +61,47 @@ function disposeCurrentLifecycle(ownerCtx: Context): void {
 }
 
 describe('agent scope lifecycle', () => {
+  it('reports completed rollback only after the prepared scope is torn down and preserves the primary failure', async () => {
+    const ctx = await harness()
+    const primary = new Error('setup rejected')
+    const order: string[] = []
+    const id = SessionId('rollback-owner-result')
+    try {
+      await expect(ctx.agents.create({
+        sessionId: id,
+        setup(agentCtx) {
+          agentCtx.effect(() => () => { order.push('scope-disposed') })
+          throw primary
+        },
+        onInitializationRollback(result) {
+          expect(result).toEqual({ sessionId: id, status: 'completed' })
+          expect(Object.isFrozen(result)).toBe(true)
+          expect(ctx.agents.get(id)).toBeUndefined()
+          expect(ctx.sessions.get(id)).toBeUndefined()
+          order.push('rollback-observed')
+          throw new Error('observer failure')
+        },
+      })).rejects.toBe(primary)
+      expect(order).toEqual(['scope-disposed', 'rollback-observed'])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('a rejecting asynchronous rollback observer cannot leak an unhandled rejection', async () => {
+    const ctx = await harness()
+    const primary = new Error('primary remains')
+    let observed = false
+    try {
+      await expect(ctx.agents.create({ sessionId: SessionId('async-rollback-observer'),
+        setup() { throw primary }, onInitializationRollback: async () => {
+          observed = true
+          throw new Error('asynchronous observer failure')
+        },
+      })).rejects.toBe(primary)
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(observed).toBe(true)
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('awaits serial creation before caller readiness', async () => {
     const ctx = await harness()
     const entered = Promise.withResolvers<undefined>()

@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-从配置的发布目录向浏览器提供已构建的 Web 壳。根路径与配置的 index 路径渲染包含启动信息的 index；已有资产直接提供，而缺失或非文件路径返回 404、路径遍历返回 403、不支持的方法返回 405。访问 index 需要有效的进程 token 或浏览器 cookie，但静态资产仍可公开访问。同一时间只能有一个实例处理未匹配的路由；第二个实例启动失败，卸载活动实例后，未匹配的请求返回 404。
+从配置的发布目录向浏览器提供已构建的 Web 壳。根路径、配置的 index 路径及已配置的 HTML 导航路径渲染包含启动信息的 index；已有资产直接提供，而缺失或非文件路径返回 404、路径遍历返回 403、不支持的方法返回 405。访问 index 需要有效的进程 token 或浏览器 cookie，但静态资产仍可公开访问。同一时间只能有一个实例处理未匹配的路由；第二个实例启动失败，卸载活动实例后，未匹配的请求返回 404。
 
 ## 目录
 
@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-在服务已构建 Web 壳的浏览器宿主中组合本插件：它占据 webserver 的回退席位，并应答所有未被具名路由命中的请求。它只需要一个配置值——已构建前端的 `index.html` 位于何处。
+在服务已构建 Web 壳的浏览器宿主中组合本插件：它占据 webserver 的回退席位，并应答所有未被具名路由命中的请求。将 `distIndex` 设为已构建前端的 `index.html`；使用 History API 路由的应用还可设置 `spaRoutePrefixes`。
 
 ### 最小配置
 
@@ -37,17 +37,19 @@ kind: "package-reference"
 
 `distIndex` 是组合应用的组装事实：[`dsh-web-app`](../../bundle/web-app/README.zh.md) 通过前端包的 exports 解析它并挂载本插件；部署绝不硬编码它。
 
+`spaRoutePrefixes` 是可选的绝对路径前缀列表，不含结尾斜杠，例如 `/workbench`。匹配的路径及其子路径仅在请求的 `Accept` 标头包含 `text/html` 时渲染 index。默认为空列表，未知路径保持 404。根前缀 `/` 无效，因为它会接管所有路径。
+
 ### 服务器实施的约束
 
-请求从 dist 根目录（包含 `distIndex` 的目录）提供。dist 根目录与配置的 index 路径以 HTTP 200 渲染 `index.html`；任何其他已有文件按自身 MIME 类型直接提供，未知扩展名按 `application/octet-stream` 提供。解析到根目录之外的路径以 403 拒绝，因此精心构造的路径无法读取 dist 之上的文件。dist 根目录内不存在或不是文件的目标——文件缺失、目录或配置的 index 缺失——返回空 404。没有匹配具名路由的非 GET／HEAD 请求返回 405。每个成功的 index 响应都经 webserver 的 `renderIndex` 渲染，因此启动 manifest（元数据清单）会通过 `/` 与配置的 index 路径送达页面。
+请求从 dist 根目录（包含 `distIndex` 的目录）提供。dist 根目录、配置的 index 路径和已配置的 HTML 导航路径以 HTTP 200 渲染 `index.html`；任何其他已有文件按自身 MIME 类型直接提供，未知扩展名按 `application/octet-stream` 提供。解析到根目录之外的路径以 403 拒绝，因此精心构造的路径无法读取 dist 之上的文件。已配置的 HTML 导航路径之外不存在或不是文件的目标返回空 404。没有匹配具名路由的非 GET／HEAD 请求返回 405。每个成功的 index 响应都经 webserver 的 `renderIndex` 渲染，因此启动 manifest（元数据清单）会送达每个入口路径。
 
-所服务的 HTML 携带唯一的文档 base `<base href="./">`，位于每一条注入资源行之前，因此它冻结页面加载时所处的入口目录：shell 自身的应用目录相对引用与宿主的插件资源行都在服务该页面的挂载下解析。同一份 index 因而既服务源站根目录，也服务剥离前缀的代理所拥有的任一挂载；本插件只为 dist 根目录与配置的 index 路径渲染它。
+根路径和配置的 index 响应携带 `<base href="./">`，支持剥离前缀的代理挂载。已配置的 SPA 导航响应携带 `<base href="/">`，让深链接从源站根路径加载前端资源。两种 base 都位于注入资源行之前。
 
-根路径与配置的 index 响应会在读取 HTML 前调用 `ctx.connection.authorizeIndex`。有效进程 token 会得到 303 重定向与持久浏览器 cookie；已有有效 cookie 时直接提供 index；其他 index 请求得到 Connection 所有的 401 响应。非 index 文件仍是公开静态资源。Token、cookie、过期时间与签名记录语义都归 Connection 所有。
+所有 index 响应（包括已配置的 SPA 导航）都会在读取 HTML 前调用 `ctx.connection.authorizeIndex`。有效进程 token 会得到 303 重定向与持久浏览器 cookie；已有有效 cookie 时直接提供 index；其他 index 请求得到 Connection 所有的 401 响应。非 index 文件仍是公开静态资源。Token、cookie、过期时间与签名记录语义都归 Connection 所有。
 
 ### 可观察的失败
 
-遍历返回 403 而不是错误页。dist 根目录内不存在或不是文件的目标返回空 404，因此失效链接或拼错的 pathname 是显式失败，而不是静默的 SPA 回退。第二次占据席位会抛错，而席位无人占据时 webserver 返回 404——本插件的 fiber 被 dispose（资源释放）后，浏览器看到的就是该响应。
+遍历返回 403 而不是错误页。已配置的 SPA 导航之外不存在或不是文件的目标返回空 404，因此未配置的路径仍是显式失败。第二次占据席位会抛错，而席位无人占据时 webserver 返回 404——本插件的 fiber 被 dispose（资源释放）后，浏览器看到的就是该响应。
 
 -----
 
@@ -104,7 +106,7 @@ kind: "package-reference"
 这些限制说明某个资产类别何时尚未被覆盖。它们是当前包约束，不是任务积压。
 
 - **初始 MIME 表很精简**：它覆盖 Vite 输出的资产集合及实际交付的 PWA manifest；其他扩展名在相应资产类别发布前都会回退到 `application/octet-stream`。
-- **Pathname 路由是显式声明**——当前客户端从根目录或配置的 index 路径进入，没有 History API pathname 路由。新增一条需要显式服务器规则与真实组合覆盖，而不是对每次未命中做宽泛回退。
+- **Pathname 路由是显式声明**——使用 History API 路由的应用必须配置相应路径前缀；未列出的路径不会得到 Web 壳。
 
 <a id="dev-note"></a>
 ### 开发备注

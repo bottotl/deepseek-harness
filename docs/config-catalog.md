@@ -1440,10 +1440,12 @@ export interface Config {
 - `source`: [`packages/host/frontend-static/src/index.ts:30`](../packages/host/frontend-static/src/index.ts)
 
 ```ts config-catalog
-/** Plugin config: the dist anchor. */
+/** Plugin config: the dist anchor and optional SPA navigation paths. */
 export interface Config {
   /** Absolute path of index.html inside the dist root. */
   distIndex: string
+  /** Absolute pathname prefixes whose HTML navigations render the authenticated index. */
+  spaRoutePrefixes?: string[]
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-frontend-static -->

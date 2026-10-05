@@ -1,8 +1,8 @@
 /**
  * @deepseek-ai/dsh-host-frontend-static — SPA dist server over the webserver
  * fallback seat: serves the built frontend directory with explicit index
- * entry points. A readable index renders at the dist root and configured index
- * path; missing paths return 404, traversal outside the dist root is 403,
+ * entry points and configured HTML navigation prefixes. A readable index
+ * renders at those paths; other missing paths return 404, traversal is 403,
  * unknown extensions ship as octet-stream, and non-GET/HEAD is 405. Every
  * index response first passes Connection's browser authentication, then the
  * webserver's index render (structured injection rows, then raw taps).
@@ -26,14 +26,17 @@ export const name = 'frontend-static'
 /** Services required before the authenticated fallback seat can be claimed. */
 export const inject = ['webServer', 'connection']
 
-/** Plugin config: the dist anchor. */
+/** Plugin config: the dist anchor and optional SPA navigation paths. */
 export interface Config {
   /** Absolute path of index.html inside the dist root. */
   distIndex: string
+  /** Absolute pathname prefixes whose HTML navigations render the authenticated index. */
+  spaRoutePrefixes?: string[]
 }
 
 export const Config: z<Config> = z.object({
   distIndex: z.string().required(),
+  spaRoutePrefixes: z.array(z.string()),
 })
 
 const HTML_MIME = 'text/html; charset=utf-8'
@@ -66,12 +69,16 @@ const STATIC_MISS_CODES: ReadonlySet<string | undefined> = new Set([
  * @param distIndex - absolute path of index.html inside distRoot.
  * @param authorizeIndex - authenticates an index response before its bytes are read.
  * @param renderIndex - produces the index.html body (structured injection
- * rendering) for the dist root and configured index path.
+ * rendering) with an absolute base for deep SPA navigation paths.
+ * @param spaRoutePrefixes - absolute pathname prefixes reserved for SPA navigation.
+ * @param acceptsHtml - whether the request accepts an HTML document.
  */
 export async function serveStatic(
   pathname: string, res: ServerResponse, distRoot: string, distIndex: string,
   authorizeIndex: () => boolean,
-  renderIndex: () => Promise<string>,
+  renderIndex: (spaNavigation: boolean) => Promise<string>,
+  spaRoutePrefixes: readonly string[] = [],
+  acceptsHtml = false,
 ): Promise<void> {
   const target = resolve(normalize(join(distRoot, pathname)))
   // Traversal rejection: the target must be distRoot itself (`/`) or stay under
@@ -85,9 +92,11 @@ export async function serveStatic(
   let body: string | Buffer
   let type: string
   try {
-    if (target === distRoot || target === distIndex) {
+    const spaNavigation = acceptsHtml && spaRoutePrefixes.some(prefix =>
+      pathname === prefix || pathname.startsWith(`${prefix}/`))
+    if (target === distRoot || target === distIndex || spaNavigation) {
       if (!authorizeIndex()) return
-      body = await renderIndex()
+      body = await renderIndex(spaNavigation)
       type = HTML_MIME
     } else {
       body = await readFile(target)
@@ -113,10 +122,16 @@ export async function serveStatic(
 export function apply(ctx: Context, config: Config): void {
   const distIndex = config.distIndex
   const distRoot = dirname(distIndex)
-  // Insert after all index transforms so the base precedes every resource reference.
-  const renderIndex = async (): Promise<string> => {
+  const spaRoutePrefixes = config.spaRoutePrefixes ?? []
+  for (const prefix of spaRoutePrefixes) {
+    if (!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(prefix)) {
+      throw new Error(`invalid SPA route prefix: ${prefix}`)
+    }
+  }
+  // Root entries retain their mount-relative base; deep SPA entries resolve assets at the origin root.
+  const renderIndex = async (spaNavigation: boolean): Promise<string> => {
     const body = ctx.webServer.renderIndex(await readFile(distIndex, 'utf8'))
-    return body.replace(/<head(?:\s[^>]*)?>/i, open => `${open}<base href="./">`)
+    return body.replace(/<head(?:\s[^>]*)?>/i, open => `${open}<base href="${spaNavigation ? '/' : './'}">`)
   }
   ctx.effect(() => ctx.webServer.registerFallback(async (req, res) => {
     // Non-GET/HEAD without a matching named route is 405 (fallback-only
@@ -135,6 +150,8 @@ export function apply(ctx: Context, config: Config): void {
       distIndex,
       () => ctx.connection.authorizeIndex(req, res),
       renderIndex,
+      spaRoutePrefixes,
+      req.headers.accept?.toLowerCase().includes('text/html') ?? false,
     )
   }), 'frontend-static: fallback seat')
 }

@@ -319,6 +319,38 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     await ctx.fiber.dispose()
   })
 
+  it('reports a failed prepared rollback when owned persistence close rejects without replacing setup failure', async () => {
+    const { ctx } = await persistentHarness(new MockAdapter([]))
+    const primary = new Error('setup failure is primary')
+    const cleanup = new Error('owned close failed')
+    const originalCreate = ctx.sessionPersistence.create.bind(ctx.sessionPersistence)
+    let handle: SessionHandle | undefined
+    let closeSpy: MockInstance | undefined
+    ctx.sessionPersistence.create = async (header, options) => {
+      handle = await originalCreate(header, options)
+      closeSpy = vi.spyOn(handle, 'close').mockRejectedValue(cleanup)
+      return handle
+    }
+    const results: unknown[] = []
+    const sessionId = SessionId('prepared-rollback-close-failure')
+    try {
+      await expect(ctx.agents.create({
+        sessionId,
+        setup() { throw primary },
+        onInitializationRollback(result) { results.push(result) },
+      })).rejects.toBe(primary)
+      expect(results).toEqual([{ sessionId, status: 'failed', cleanupError: cleanup }])
+      expect((results[0] as { cleanupError: unknown }).cleanupError).toBe(cleanup)
+      expect(ctx.agents.get(sessionId)).toBeUndefined()
+      expect(ctx.sessions.get(sessionId)).toBeUndefined()
+      // Missing registry entries did not produce a false successful receipt.
+    } finally {
+      closeSpy?.mockRestore()
+      await handle?.close()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('rollback swallows a rejecting handle close after a prepare failure (create and createAgent)', async () => {
     const { ctx } = await persistentHarness(new MockAdapter([]))
     const originalCreate = ctx.sessionPersistence.create.bind(ctx.sessionPersistence)
@@ -722,12 +754,14 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     const sessionId = SessionId('resume-setup-reject')
     const root = await persistSession(sessionId)
     const ctx = await mountPersistentHarness(root, new MockAdapter([textResponse('next')]))
+    const rollbacks: unknown[] = []
     const published: string[] = []
     ctx.on('session/created', () => void published.push('session/created'))
     ctx.on('agent/created', () => void published.push('agent/created'))
 
     await expect(ctx.agents.resume({
       resumeSessionId: sessionId,
+      onInitializationRollback: (result) => { rollbacks.push(result) },
       agentOptions: { provider: 'mock', model: 'mock' },
       setup: async () => {
         await Promise.resolve()
@@ -735,6 +769,7 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
       },
     })).rejects.toThrow('resume setup failed')
 
+    expect(rollbacks).toEqual([{ sessionId, status: 'completed' }])
     expect(published).toEqual([])
     expect(ctx.agents.get(sessionId)).toBeUndefined()
     expect(ctx.sessions.get(sessionId)).toBeUndefined()
@@ -744,6 +779,34 @@ describe('the session-persistence Agent Note: AgentLoop factory create/resume', 
     })
     await retry.dispose()
     await ctx.fiber.dispose()
+  })
+
+  it('resume rollback reports the exact failing write close and preserves setup failure', async () => {
+    const sessionId = SessionId('resume-rollback-close-failure')
+    const root = await persistSession(sessionId)
+    const ctx = await mountPersistentHarness(root, new MockAdapter([]))
+    const originalOpen = ctx.sessionPersistence.open.bind(ctx.sessionPersistence)
+    const primary = new Error('resume primary')
+    const cleanup = new Error('resume write close')
+    let handle: SessionHandle | undefined
+    let spy: MockInstance | undefined
+    let result: { status: string; cleanupError?: unknown } | undefined
+    ctx.sessionPersistence.open = async (id, mode, options) => {
+      const opened = await originalOpen(id, mode, options)
+      if (mode === 'write') { handle = opened; spy = vi.spyOn(opened, 'close').mockRejectedValue(cleanup) }
+      return opened
+    }
+    try {
+      await expect(ctx.agents.resume({ resumeSessionId: sessionId,
+        setup() { throw primary }, onInitializationRollback(value) { result = value },
+      })).rejects.toBe(primary)
+      expect(result?.status).toBe('failed')
+      expect(result?.cleanupError).toBe(cleanup)
+    } finally {
+      spy?.mockRestore()
+      await handle?.close()
+      await ctx.fiber.dispose()
+    }
   })
 
   it('resume setup commit rejection publishes nothing and releases the identity', async () => {
