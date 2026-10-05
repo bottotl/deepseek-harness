@@ -1,0 +1,29 @@
+packages/client/ui-sidebar-documentpreview/package.json
+  s_bbea00a81e9963::t_486946e93c05ea 88
+pnpm-lock.yaml
+  s_268a47162a1046::t_eceae651d536a6 5509-5510,22166-22167,29886
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d6736bbe1fd7e763a9a722588f0a0180fc17cc26",
+  "prompts": {},
+  "sessions": {
+    "s_268a47162a1046": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a10a90-b43c-76f3-8a64-b3f21d39f4d7",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "yulintao3 <yulintao3@jd.com>"
+    },
+    "s_bbea00a81e9963": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c8aed8f3-c2e3-4925-b284-3f8fae6d2cfa",
+        "model": "glm-5.3"
+      },
+      "human_author": "yulintao3 <yulintao3@jd.com>"
+    }
+  }
+}
