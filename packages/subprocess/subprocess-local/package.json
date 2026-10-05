@@ -34,12 +34,8 @@
     "lib/runner.js",
     "lib/runner-*.js",
     "lib/output.js",
-    "scripts/ensure-spawn-helper.mjs",
     "lib/types/**/*.d.ts"
   ],
-  "scripts": {
-    "postinstall": "node scripts/ensure-spawn-helper.mjs"
-  },
   "license": "MIT",
   "peerDependencies": {
     "@deepseek-ai/dsh-subprocess": "workspace:*",

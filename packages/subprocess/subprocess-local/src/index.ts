@@ -46,6 +46,7 @@ import { createProcessInspector } from './process-inspector.ts'
 import type { ProcessInspector } from './process-inspector.ts'
 import { LocalTerminalHandle } from './terminal.ts'
 import { prepareShellActivity } from './shell-activity.ts'
+import { ensureNodePtySpawnHelper, resolveInstalledNodePtyEntry } from './spawn-helper.ts'
 
 const requireNodePty = createLazyRequire<typeof NodePty>('node-pty', import.meta.url)
 
@@ -267,10 +268,19 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       throw new Error('subprocess-local: terminal argv must contain a program')
     }
     spec.signal?.throwIfAborted()
+    const platform = this.internals.platform ?? process.platform
+    ensureNodePtySpawnHelper({
+      platform,
+      arch: process.arch,
+      execPath: process.execPath,
+      // Passed as the platform provides it: queried only past the macOS gate, where it exists.
+      geteuid: process.geteuid,
+      resolveNodePtyEntry: resolveInstalledNodePtyEntry,
+    })
     const inspector = this.terminalInspector ?? createProcessInspector()
     const containmentMode = this.selectContainmentMode('terminal')
     const env = targetEnvironment(spec)
-    const activity = prepareShellActivity(spec, env, this.internals.platform ?? process.platform)
+    const activity = prepareShellActivity(spec, env, platform)
     const launch = activity === undefined ? spec : { ...spec, argv: activity.argv, env: activity.env }
     const options: IPtyForkOptions = {
       name: spec.terminalType,
@@ -309,7 +319,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       terminal,
       inspector,
       spec.graceMs,
-      this.internals.platform ?? process.platform,
+      platform,
       owner,
       scope?.resolveOutcome,
       activity,

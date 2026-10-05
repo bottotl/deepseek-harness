@@ -33,6 +33,9 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/terminal/terminal-bash',
       'packages/experimental/ptc-runtime-python',
       'packages/sandbox/sandbox-local',
+      // The spawn-helper check pins POSIX permission-bit semantics (lstat/chmod
+      // modes), which Windows does not carry.
+      'packages/subprocess/subprocess-local/tests/spawn-helper.spec.ts',
       // OpenSSH multiplexing and Unix-socket helper streams require POSIX endpoints.
       'packages/ssh/*',
     ]
