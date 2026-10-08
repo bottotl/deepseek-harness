@@ -908,7 +908,8 @@ export class PluginManagerController {
     // the wire, and every such event reads again; those reads must not cancel
     // the run's settlement.
     const result = await this.ctx.remote.pluginManager.installBundle(spec, {
-      enabled: false, requestId, registry, ...approvedBuilds === undefined ? {} : { approvedBuilds: [...approvedBuilds] },
+      enabled: subject.activateOnInstall === true, requestId, registry,
+      ...approvedBuilds === undefined ? {} : { approvedBuilds: [...approvedBuilds] },
     })
     if (this.disposed || this.request !== request) return
     if (!result.ok) {

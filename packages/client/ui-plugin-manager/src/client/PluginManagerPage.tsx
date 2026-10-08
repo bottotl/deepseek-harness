@@ -1298,7 +1298,7 @@ function InstallDialog({
             : null}
           {phase !== 'done'
             ? null
-            : install.installed !== null
+            : install.installed !== null && subject?.activateOnInstall !== true
               ? <Button variant="primary" className={css.wide} disabled={install.enabling} aria-busy={install.enabling} onClick={onEnableNow}>{t('installEnableNow')}</Button>
               : <Button variant="primary" className={css.wide} onClick={onClose}>{t('installClose')}</Button>}
         </div>

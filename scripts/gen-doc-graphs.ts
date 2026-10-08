@@ -124,6 +124,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Races public registry responses on the Host; the Client owns the initial registry recommendation.',
   },
   {
+    key: 'pluginManagementOperations',
+    pkg: 'plugin-manager',
+    title: 'Product-owned profile mutations',
+    mode: 'seam',
+    consumers: ['plugin-manager'],
+    note: 'Products provide transactional inspection, installation and lifecycle operations for immutable profiles; managed mode requires this provider.',
+  },
+  {
     key: 'pluginManager',
     pkg: 'plugin-manager',
     title: 'Current-profile plugin and bundle management',

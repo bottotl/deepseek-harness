@@ -1799,3 +1799,16 @@ it('reports a successful install with only documented result fields', async () =
     input_value: 'dsh-new', is_success: true, duration: expect.any(Number) as number, plugin_name: 'dsh-new',
   }]])
 })
+
+it('requests activation only when the product inspection declares an atomic install', async () => {
+  const { plugins, face, state } = bench({
+    inspect: vi.fn(() => Promise.resolve(ok({ ...INSPECTED, activateOnInstall: true }))),
+    installBundle: vi.fn(() => Promise.resolve(ok({ ...APPLIED, stage: 'install', bundle: 'dsh-new', enabled: true }))),
+  })
+  face.openInstall()
+  await vi.waitFor(() => { expect(state().install.registries).not.toBeNull() })
+  face.editInstallSpec('dsh-new')
+  face.runInstall()
+  await vi.waitFor(() => { expect(state().install.phase).toBe('done') })
+  expect(plugins.installBundle).toHaveBeenCalledWith('dsh-new', expect.objectContaining({ enabled: true }))
+})

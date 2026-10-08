@@ -65,6 +65,7 @@ export {
   removeLinkProjections,
   loadProfile,
   loadProfileDirectory,
+  loadBundleLayers,
   PROFILE_PATCH_FILENAME,
   PROFILE_TEMPLATES,
   PROFILES_DIR,

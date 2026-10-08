@@ -812,3 +812,32 @@ describe('removeLinkProjections', () => {
     expect(existsSync(join(profile, 'node_modules', 'my-plugin', 'package.json'))).toBe(true)
   })
 })
+
+
+it('inherits installed bundle layers once and applies the product last', () => {
+  const anchor = stageInstallation({
+    base: { patch: '- insert:\n    - id: base\n      name: base-plugin\n' },
+    web: { patch: '- insert:\n    - id: web\n      name: web-plugin\n' },
+    product: { patch: '- id: web\n  disabled: true\n' },
+  })
+  const product = join(dirname(anchor), 'node_modules/product/package.json')
+  const manifest = JSON.parse(readFileSync(product, 'utf8'))
+  manifest.dsh.bundle.extends = ['base', 'web', 'base']
+  writeFileSync(product, JSON.stringify(manifest))
+  const dir = join(tmp(), 'profile')
+  initProfile(dir, ['product', 'base'])
+  const loaded = loadProfileDirectory('test', dir, anchor)
+  expect(loaded.layers.map(layer => layer.packageName)).toEqual(['base', 'web', 'product'])
+  expect(composeEntries(loaded.layers.map(layer => layer.patches)).find(row => row.id === 'web')?.disabled).toBe(true)
+  expect(loaded.skippedBundles).toEqual([])
+  manifest.dsh.bundle.extends = ['base', 'product']
+  writeFileSync(product, JSON.stringify(manifest))
+  const cyclic = loadProfileDirectory('test', dir, anchor)
+  expect(cyclic.layers.map(layer => layer.packageName)).toEqual(['base'])
+  expect(cyclic.skippedBundles[0]?.reason).toContain('cyclic bundle inheritance')
+  manifest.dsh.bundle.extends = ['base', 'missing-parent']
+  writeFileSync(product, JSON.stringify(manifest))
+  const missing = loadProfileDirectory('test', dir, anchor)
+  expect(missing.layers.map(layer => layer.packageName)).toEqual(['base'])
+  expect(missing.skippedBundles[0]?.packageName).toBe('product')
+})

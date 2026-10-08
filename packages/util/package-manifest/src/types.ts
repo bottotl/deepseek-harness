@@ -67,6 +67,8 @@ export interface DshEnginesManifest {
 
 /** The configuration layer exported by a bundle package. */
 export interface DshBundleManifest {
+  /** Installed bundle layers applied before this bundle, in order; cycles reject the selecting bundle. */
+  extends?: string[]
   /** One patch file path, or an ordered list applied in sequence, each relative to the declaring package root. */
   patch: string | string[]
 }

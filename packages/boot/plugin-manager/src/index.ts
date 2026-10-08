@@ -12,7 +12,7 @@ import z from '@deepseek-ai/schemastery'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { pluginEntryId, readPluginInventory } from '@deepseek-ai/dsh-host-plugin-inventory'
 import {
-  readPluginMeta, readProfileManifest, resolveBundleDir, loadOverlayPatches, composeEntries,
+  loadBundleLayers, readPluginMeta, readProfileManifest, resolveBundleDir, loadOverlayPatches, composeEntries,
   reconcileProfilePatches, readProfilePatches, OPTIONAL_BUNDLES, bundlePatchPaths,
   evaluatePluginCompatibility, readProfileCompatibility, readProfileVersionExemptions,
   setProfileVersionExemption, PROFILE_COMPATIBILITY_FILENAME,
@@ -36,8 +36,27 @@ export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
 export { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
 
-/** The pnpm executable, registries, and limits for diagnostics, lookups and connection checks. */
+/** Product-owned mutations of an immutable or transactionally activated profile.
+ * Providers retain the public Remote results; managed mode rejects an absent provider rather than changing profile files.
+ */
+export interface PluginManagementOperations extends Pick<PluginManager,
+  'inspect' | 'installBundle' | 'waitForInstall' | 'cancelInstall' | 'setBundleEnabled'
+  | 'setPluginEnabled' | 'removeBundle' | 'setVersionExemption'> {
+  /** Whether the product owns lifecycle operations for this installed package.
+   * @param name Installed package name.
+   * @returns Whether the native bundle controls are available.
+   */
+  canManageBundle?(name: string): boolean
+  /** Product-managed packages whose runtime is not a DSH YAML bundle.
+   * @returns Additional inventory entries, excluding native bundle names.
+   */
+  additionalBundles?(): BundleInfo[]
+}
+
+/** The package-manager limits and optional product mutation owner. */
 export interface Config {
+  /** Require product-owned mutations rather than writing profile files directly. */
+  managedOperations?: boolean
   /** The pnpm executable name or path; resolved through `PATH` like the `dsh plugin` command. */
   pnpmCommand?: string
   /** Maximum retained package-operation diagnostic bytes. */
@@ -169,6 +188,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Persistent management of the current profile's composition and packages. */
     pluginManager: PluginManager
+    /** Optional product transaction provider for profile mutations. */
+    pluginManagementOperations: PluginManagementOperations
   }
 }
 
@@ -176,6 +197,7 @@ declare module '@deepseek-ai/cordis' {
 export class PluginManager extends TypertRemoteService {
   static inject = ['loader', 'profileContext']
   static Config: z<Config> = z.object({
+    managedOperations: z.boolean().default(false),
     pnpmCommand: z.string().default('pnpm'),
     outputBytes: z.number().step(1).min(1).default(16384),
     lockWaitMs: z.number().step(1).min(0).default(120000),
@@ -187,6 +209,7 @@ export class PluginManager extends TypertRemoteService {
   })
   /** Management bundles remain protected if their files become unreadable. */
   private readonly managementBundles = new Set<string>()
+  private readonly managedOperations: boolean
   private readonly ownerEntryId: string | undefined
   private readonly packageOperations = new Set<Promise<unknown>>()
   private readonly profile: ProfileContext
@@ -204,6 +227,7 @@ export class PluginManager extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'pluginManager')
+    this.managedOperations = config.managedOperations === true
     this.ownerEntryId = ctx.fiber.entry?.id
     this.ownerContext = ctx
     this.profile = ctx.profileContext
@@ -222,6 +246,13 @@ export class PluginManager extends TypertRemoteService {
       this.abort.abort()
       await Promise.allSettled([...this.packageOperations])
     }, 'plugin-manager: package cancellation')
+  }
+
+  private productOperations(): PluginManagementOperations | undefined {
+    if (!this.managedOperations) return undefined
+    const provider = this.ownerContext.get('pluginManagementOperations')
+    if (provider === undefined) throw new Error('Product plugin management operations are unavailable.')
+    return provider
   }
 
   /** Read exact plugin-version exemptions saved in this profile.
@@ -243,6 +274,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   setVersionExemption(packageVersion: string, runtimeVersion: string, enabled: boolean, acceptRisk?: boolean): Promise<ChangeResult> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.setVersionExemption(packageVersion, runtimeVersion, enabled, acceptRisk)
     return this.change(result => this.configure(async () => {
       await setProfileVersionExemption(this.profile.dir, packageVersion, runtimeVersion, enabled, acceptRisk === true)
       result.warnings = await this.reload()
@@ -260,6 +293,7 @@ export class PluginManager extends TypertRemoteService {
       const actual = [...this.ctx.loader.entries()].find(row => row.id === entry.entryId)
       const candidates = rows.filter(row => row.id === actual?.options.id)
       const candidate = candidates[0]
+      if (this.managedOperations) return { ...entry, readOnlyReason: 'unaddressable' as const }
       if (protectedModules.has(entry.moduleName) || entry.entryId === this.ownerEntryId) {
         return { ...entry, readOnlyReason: 'management-required' as const }
       }
@@ -298,7 +332,8 @@ export class PluginManager extends TypertRemoteService {
       const removable = owned || (enabled && !installed && !shipped)
       const sourceOf = (packageName?: string): { source?: string } =>
         owned ? { source: dependencySpec(name, recorded[name] as string, this.profile.dir, packageName) } : {}
-      const readOnlyReason = this.protectsManager(name) ? 'management-required' as const : undefined
+      const readOnlyReason = this.protectsManager(name) ? 'management-required' as const
+        : this.managedOperations && this.productOperations()?.canManageBundle?.(name) === false ? 'unaddressable' as const : undefined
       try {
         const info = bundleManifest(name, this.profile.dir, this.profile.installAnchor)
         if (info === undefined) {
@@ -324,7 +359,8 @@ export class PluginManager extends TypertRemoteService {
         }
       }
     }
-    return Promise.resolve(bundles)
+    const additional = this.managedOperations ? this.productOperations()?.additionalBundles?.() ?? [] : []
+    return Promise.resolve([...bundles, ...additional.filter(bundle => !bundles.some(native => native.name === bundle.name))])
   }
 
   /** Read the registries this manager asks: the configured first one, its fallbacks in order, and what pnpm's own configuration names.
@@ -348,6 +384,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async inspect(spec: string, options?: InspectOptions, signal?: AbortSignal): Promise<PluginSpecInspection> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.inspect(spec, options, signal)
     let parsed
     try {
       parsed = parseInstallSpec(spec)
@@ -432,6 +470,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.setPluginEnabled(id, enabled)
     return this.change(result => this.configure(async () => {
       const row = (await this.listPlugins()).find(item => item.entryId === id)
       if (row === undefined) throw new ManagementFailure('unknown-plugin')
@@ -450,6 +490,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.setBundleEnabled(name, enabled)
     return this.change(result => this.configure(async () => {
       await this.selectBundle(name, enabled)
       if (enabled) await this.refreshPackages()
@@ -471,6 +513,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   installBundle(spec: string, options?: InstallBundleOptions): Promise<ChangeResult> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.installBundle(spec, options)
     const requestId = options?.requestId
     const control: InstallControl = { abort: new AbortController(), phase: 'installing', result: Promise.resolve(null) }
     const stopped = (): boolean => control.abort.signal.aborted || this.abort.signal.aborted
@@ -588,6 +632,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async waitForInstall(requestId: PluginInstallRequestId): Promise<ChangeResult | null> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.waitForInstall(requestId)
     return this.installs.get(requestId)?.result ?? null
   }
 
@@ -598,6 +644,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async cancelInstall(requestId: PluginInstallRequestId): Promise<PluginInstallCancellation> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.cancelInstall(requestId)
     const control = this.installs.get(requestId)
     if (control === undefined) return { status: 'not-running' }
     if (control.phase === 'applying') return { status: 'too-late' }
@@ -615,6 +663,8 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   removeBundle(name: string): Promise<ChangeResult> {
+    const managed = this.productOperations()
+    if (managed !== undefined) return managed.removeBundle(name)
     return this.change(async (result) => {
       const installed = await this.configure(async () => {
         const bundle = (await this.listBundles()).find(item => item.name === name)
@@ -756,8 +806,7 @@ export class PluginManager extends TypertRemoteService {
   private bundleRows(name: string): EntryOptions[] {
     const info = bundleManifest(name, this.profile.dir, this.profile.installAnchor)
     if (info?.dsh?.bundle === undefined) return []
-    const dir = resolveBundleDir('dsh', name, this.profile.installAnchor, this.profile.dir)
-    return flatten(composeEntries([bundlePatchPaths(dir, info.dsh.bundle).flatMap(file => loadOverlayPatches('dsh', file))]))
+    return flatten(composeEntries(loadBundleLayers('dsh', name, this.profile.installAnchor, this.profile.dir).map(layer => layer.patches)))
   }
 
   private protectsManager(name: string): boolean {

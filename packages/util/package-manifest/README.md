@@ -11,6 +11,8 @@ English | [中文](README.zh.md)
 
 Use `DshPackageManifest` for package metadata, `DshManifest` for the public fields under `dsh`, and member types such as `DshClientManifest` for one domain. Each reader owns JSON parsing, validation, and default resolution.
 
+`DshBundleManifest.extends` declares installed parent bundles. The profile loader owns ordering, duplicate elimination, compatibility checks and cycle rejection; the manifest declaration does not download packages.
+
 ## Table of Contents
 
 - [Use this package](#use-this-package)

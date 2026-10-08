@@ -57,6 +57,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   productAnalytics: 'product-telemetry.md',
   connection: 'web-server.md',
   pluginManager: 'boot.md',
+  pluginManagementOperations: 'boot.md',
   pluginRegistryProbe: 'boot.md',
   configEditor: 'boot.md',
   profileContext: 'boot.md',

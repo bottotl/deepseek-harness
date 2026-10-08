@@ -11,6 +11,8 @@ kind: "package-library"
 
 使用 `DshPackageManifest` 描述包元数据、`DshManifest` 描述 `dsh` 下的公共字段，以及 `DshClientManifest` 等成员类型描述单个领域。各读取方负责 JSON 解析、校验和默认值解析。
 
+`DshBundleManifest.extends` 声明已安装的父组合包。profile loader 负责排序、去重、兼容检查和循环拒绝；清单声明本身不下载包。
+
 ## 目录
 
 - [使用本包](#use-this-package)

@@ -716,6 +716,42 @@ export function resolveBundleDir(
   )
 }
 
+/** Resolve a bundle and its inherited layers atomically, for launch and management.
+ * @param binName Diagnostic prefix.
+ * @param name Installed bundle package name.
+ * @param installAnchor Installation manifest used for resolution.
+ * @param dir Active profile directory.
+ * @returns Parent layers followed by the selecting bundle; duplicate parents appear once.
+ * @throws Rejects invalid names, cycles, incompatible or unreadable layers without returning partial configuration.
+ */
+export function loadBundleLayers(binName: string, name: string, installAnchor: string, dir: string): ProfileLayer[] {
+  const exemptions = readProfileVersionExemptions(dir)
+  const expand = (packageName: string, chain: readonly string[], pending: ProfileLayer[]): void => {
+    if (chain.includes(packageName)) throw new Error(`${binName}: cyclic bundle inheritance: ${[...chain, packageName].join(' -> ')}`)
+    if (pending.some(layer => layer.packageName === packageName)) return
+    const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
+    const bundleManifest = readProfileManifest(binName, packageDir)
+    const bundle = bundleManifest.dsh?.bundle
+    if (bundle === undefined) {
+      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
+    }
+    const issue = evaluatePluginCompatibility(bundleManifest, exemptions)
+    if (issue !== undefined && !issue.exempted) throw new Error(pluginCompatibilityWarning(issue))
+    const parents = bundle.extends ?? []
+    if (!Array.isArray(parents) || parents.some(name => typeof name !== 'string' || !name || name === '.' || name === '..'
+      || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/u.test(name))) {
+      throw new Error(`${binName}: dsh.bundle.extends must be an array of installed package names`)
+    }
+    for (const parent of parents) expand(parent, [...chain, packageName], pending)
+    const patchPaths = bundlePatchPaths(packageDir, bundle)
+    const patches = patchPaths.flatMap(patchPath => loadOverlayPatches(binName, patchPath))
+    pending.push({ packageName, packageDir, patchPaths, patches })
+  }
+  const pending: ProfileLayer[] = []
+  expand(name, [], pending)
+  return pending
+}
+
 /**
  * Load an already initialized profile directory without resolving it through
  * the shared Harness home. This is used by application-owned profiles whose
@@ -739,21 +775,14 @@ export function loadProfileDirectory(
   const bundles = manifest.dsh?.profile?.bundles ?? []
   const layers: ProfileLayer[] = []
   const skippedBundles: SkippedBundle[] = []
-  const exemptions = bundles.length === 0 ? {} : readProfileVersionExemptions(dir)
+  const applied = new Set<string>()
   for (const packageName of bundles) {
     try {
-      const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
-      const bundleManifest = readProfileManifest(binName, packageDir)
-      const bundle = bundleManifest.dsh?.bundle
-      if (bundle === undefined) {
-        throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
+      const pending = loadBundleLayers(binName, packageName, installAnchor, dir)
+      for (const layer of pending) {
+        if (!applied.has(layer.packageName)) layers.push(layer)
+        applied.add(layer.packageName)
       }
-      // A bundle is not a plugin row, so row admission never reads its own peers.
-      const issue = evaluatePluginCompatibility(bundleManifest, exemptions)
-      if (issue !== undefined && !issue.exempted) throw new Error(pluginCompatibilityWarning(issue))
-      const patchPaths = bundlePatchPaths(packageDir, bundle)
-      const patches = patchPaths.flatMap(patchPath => loadOverlayPatches(binName, patchPath))
-      layers.push({ packageName, packageDir, patchPaths, patches })
     } catch (error) {
       skippedBundles.push({ packageName, reason: String(error) })
     }

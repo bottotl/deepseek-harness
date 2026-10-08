@@ -1451,3 +1451,39 @@ it.each([false, true])('rechecks installed bundle peers before accepting a disab
   }
   expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core', 'extra'])
 })
+
+
+it('requires the product transaction provider and never falls back to direct profile writes', async () => {
+  const { manager, dir, ctx } = await fixture('startup', false, undefined, { managedOperations: true })
+  const manifest = readFileSync(join(dir, 'package.json'), 'utf8')
+  expect(() => manager.installBundle('a-package')).toThrow('Product plugin management operations are unavailable')
+  const result = { changed: false, application: 'failed', stage: 'install', target: 'a-package',
+    error: { code: 'operation-error', diagnostic: 'signature required' } } as const
+  const operations = {
+    canManageBundle: (name: string) => name === 'extra',
+    additionalBundles: () => [{ name: 'product-node', enabled: true, installed: true, optional: false, removable: true, rows: [], overrides: [] }],
+    inspect: vi.fn(async () => ({ status: 'refused', problem: 'invalid-spec', reason: 'signature required' } as const)),
+    installBundle: vi.fn(async () => result),
+    waitForInstall: vi.fn(async () => result),
+    cancelInstall: vi.fn(async () => ({ status: 'too-late' } as const)),
+    setBundleEnabled: vi.fn(async () => ({ ...result, stage: 'enable' as const })),
+    setPluginEnabled: vi.fn(async () => ({ ...result, stage: 'enable' as const })),
+    removeBundle: vi.fn(async () => ({ ...result, stage: 'remove' as const })),
+    setVersionExemption: vi.fn(async () => ({ ...result, stage: 'enable' as const })),
+  }
+  ctx.provide('pluginManagementOperations', operations)
+  expect(await manager.inspect('a-package')).toMatchObject({ status: 'refused', reason: 'signature required' })
+  expect(await manager.installBundle('a-package')).toEqual(result)
+  await manager.setBundleEnabled('bundle', true)
+  await manager.setPluginEnabled('include:ordinary' as never, false)
+  await manager.removeBundle('bundle')
+  await manager.setVersionExemption('a-package@1.0.0', '0.2.1', true, true)
+  await manager.waitForInstall('request' as never)
+  await manager.cancelInstall('request' as never)
+  for (const method of Object.values(operations).filter(value => vi.isMockFunction(value))) expect(method).toHaveBeenCalledOnce()
+  expect(readFileSync(join(dir, 'package.json'), 'utf8')).toBe(manifest)
+  expect((await manager.listPlugins()).every(plugin => plugin.readOnlyReason !== undefined)).toBe(true)
+  const bundles = await manager.listBundles()
+  expect(bundles.find(bundle => bundle.name === 'product-node')).toMatchObject({ enabled: true, removable: true })
+  expect(bundles.find(bundle => bundle.name === 'core')).toMatchObject({ removable: false })
+})

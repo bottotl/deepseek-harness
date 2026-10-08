@@ -82,6 +82,27 @@ async getLinked(url: string): Promise<string[]>
 
 Source: [`packages/boot/hmr/src/index.ts`](../../packages/boot/hmr/src/index.ts)
 
+<a id="ctxpluginmanagementoperations--pluginmanagementoperations"></a>
+
+### `ctx.pluginManagementOperations` — `PluginManagementOperations`
+
+Product-owned mutations of an immutable or transactionally activated profile. Providers retain the public Remote results; managed mode rejects an absent provider rather than changing profile files.
+
+```ts cordis-catalog
+/** Whether the product owns lifecycle operations for this installed package.
+ * @param name Installed package name.
+ * @returns Whether the native bundle controls are available.
+ */
+canManageBundle?(name: string): boolean
+
+/** Product-managed packages whose runtime is not a DSH YAML bundle.
+ * @returns Additional inventory entries, excluding native bundle names.
+ */
+additionalBundles?(): BundleInfo[]
+```
+
+Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)
+
 <a id="ctxpluginmanager--pluginmanager"></a>
 
 ### `ctx.pluginManager` — `PluginManager`

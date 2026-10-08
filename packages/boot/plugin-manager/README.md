@@ -28,6 +28,8 @@ Manage the current profile's plugins without editing configuration by hand. Enab
 <a id="use-this-package"></a>
 ## Use this package
 
+Application-owned immutable profiles set `managedOperations: true` and provide `ctx.pluginManagementOperations`. Inspection, install receipts and mutations then use that provider; a missing provider fails without falling back to profile writes. Individual Loader rows are read-only in this mode. Optional `canManageBundle` and `additionalBundles` expose product lifecycle availability and installed runtimes outside YAML bundles. An accepted inspection may set `activateOnInstall: true` for a transaction that installs and activates together; the native dialog then omits deferred enablement.
+
 Base-backed profiles provide the manager. In Web, the sidebar's **Plugins** page ([ui-plugin-manager](../../client/ui-plugin-manager/README.md)) manages the profile's bundles and their uniquely addressable rows; the Settings Plugin list stays read-only. Agent-preset rows remain read-only. The `plugin_manager` tool exposes the same operations and is enabled in Creator mode. Other presets keep it disabled by default. Every tool action requires `danger-full-access` or approval for that call. Under lower sandbox modes, `ask` requests approval; `never`, rejection, cancellation, or an unavailable approval channel prevents execution. An approval leaves the session permission mode unchanged. Profile changes persist across sessions, and installed Host code executes in-process outside the workspace sandbox. Dependency build-script approval remains separate.
 
 For a deployment without agent presets, enable the tool in the profile patch. Preset-backed sessions use their preset’s `tool-plugin-manager` entry.

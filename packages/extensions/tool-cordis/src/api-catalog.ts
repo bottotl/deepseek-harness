@@ -1649,6 +1649,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'pluginManagementOperations',
+    summary: 'Product-owned mutations of an immutable or transactionally activated profile.',
+    description: 'Product-owned mutations of an immutable or transactionally activated profile. Providers retain the public Remote results; managed mode rejects an absent provider rather than changing profile files.',
+    methods: [
+      {
+        signature: 'canManageBundle?(name: string): boolean',
+        description: 'Whether the product owns lifecycle operations for this installed package.',
+        parameters: [{ name: 'name', description: 'Installed package name.' }],
+        returns: 'Whether the native bundle controls are available.',
+      },
+      {
+        signature: 'additionalBundles?(): BundleInfo[]',
+        description: 'Product-managed packages whose runtime is not a DSH YAML bundle.',
+        parameters: [],
+        returns: 'Additional inventory entries, excluding native bundle names.',
+      },
+    ],
+  },
+  {
     key: 'pluginManager',
     summary: 'Manage profile files and apply their declared reload lifecycle.',
     description: 'Manage profile files and apply their declared reload lifecycle.',
@@ -4497,6 +4516,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AgentHandle {\n    agent: Agent;\n    dispose(): Promise<void>;\n}',
   },
   {
+    name: 'AgentInitializationRollback',
+    declaration: 'export type AgentInitializationRollback = {\n    readonly sessionId: SessionId;\n    readonly status: \'completed\';\n} | {\n    readonly sessionId: SessionId;\n    readonly status: \'failed\';\n    readonly cleanupError: unknown;\n};',
+  },
+  {
+    name: 'AgentInitializationRollbackObserver',
+    declaration: 'export type AgentInitializationRollbackObserver = (result: AgentInitializationRollback) => void | Promise<void>;',
+  },
+  {
     name: 'AgentOptions',
     declaration: 'export interface AgentOptions {\n    provider?: string;\n    model?: string;\n    reasoningEffort?: ReasoningEffortId;\n    maxTokens?: number;\n}',
   },
@@ -5006,7 +5033,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CreateAgentOptions',
-    declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly isSeeded?: boolean;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly inheritedEventCount?: SessionLogOffset;\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+    declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly isSeeded?: boolean;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly inheritedEventCount?: SessionLogOffset;\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n    readonly onInitializationRollback?: AgentInitializationRollbackObserver;\n}',
   },
   {
     name: 'CreateGoalRequest',
@@ -6094,7 +6121,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PluginSpecInspection',
-    declaration: 'export type PluginSpecInspection = {\n    readonly status: \'accepted\';\n    readonly kind: InstallSpecKind;\n    readonly name?: string;\n    readonly version?: string;\n    readonly description?: string;\n    readonly bundle: boolean | null;\n    readonly registry: Registry;\n    readonly host?: string;\n} | {\n    readonly status: \'refused\';\n    readonly problem: PluginInspectProblem;\n    readonly reason: string;\n    readonly registries?: Registry[];\n};',
+    declaration: 'export type PluginSpecInspection = {\n    readonly status: \'accepted\';\n    readonly activateOnInstall?: boolean;\n    readonly kind: InstallSpecKind;\n    readonly name?: string;\n    readonly version?: string;\n    readonly description?: string;\n    readonly bundle: boolean | null;\n    readonly registry: Registry;\n    readonly host?: string;\n} | {\n    readonly status: \'refused\';\n    readonly problem: PluginInspectProblem;\n    readonly reason: string;\n    readonly registries?: Registry[];\n};',
   },
   {
     name: 'PostToolDecision',
@@ -6394,7 +6421,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResumeAgentOptions',
-    declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+    declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n    readonly onInitializationRollback?: AgentInitializationRollbackObserver;\n}',
   },
   {
     name: 'RpcId',

@@ -182,6 +182,8 @@ export type PluginInspectProblem =
 export type PluginSpecInspection =
   | {
     readonly status: 'accepted'
+    /** Product transactions may install and activate together; ordinary DSH installs remain deferred. */
+    readonly activateOnInstall?: boolean
     readonly kind: InstallSpecKind
     readonly name?: string
     readonly version?: string

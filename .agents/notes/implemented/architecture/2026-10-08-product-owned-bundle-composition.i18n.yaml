@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-08-product-owned-bundle-composition.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-08-product-owned-bundle-composition.md
+/agent-note-product-owned-bundle-composition:
+  en: f939051ba1684633
+  zh: a658f5ee5cc172f7
+/agent-note-product-owned-bundle-composition/problem:
+  en: bae8c87ab2d9a465
+  zh: e67cdc1628007ae7
+/agent-note-product-owned-bundle-composition/decision:
+  en: 458853b50b241464
+  zh: cf72827aebc8485f
+/agent-note-product-owned-bundle-composition/alternatives-considered:
+  en: 0019994c6581757f
+  zh: 7ddf7e1992c3fac7
+/agent-note-product-owned-bundle-composition/consequences:
+  en: 2d73db1acb972e47
+  zh: 8a488e8b42597061
