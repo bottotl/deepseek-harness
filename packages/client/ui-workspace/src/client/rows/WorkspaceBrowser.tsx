@@ -5,8 +5,8 @@
  * dialogs. Wide state renders the full browser; rail state renders the two
  * region icons (search / add workspace) as 36px controls on the shell's shared
  * rail entry path, each requesting expansion through the owner share. Adding
- * is the header button's one action, so it raises the directory flow with no
- * menu in between; the flow and its error dialog live in WorkspacePicker
+ * opens the directory flow directly unless another plugin contributes a
+ * creation action, in which case the header presents the shared action menu; the flow and its error dialog live in WorkspacePicker
  * (same package — direct composition, no slot between them). A Session row's
  * "..." menu and hover buttons are the `sidebar.workspaces.session.menu.item`
  * and `sidebar.workspaces.session.row.action` lists rendered through this
@@ -219,6 +219,8 @@ type SessionTreeProps = Pick<
   'useSessionStatus' | 'startSession' | 'open'
   | 'insertWorkspaceBefore' | 't' | 'usePanelInfo'
 > & PropsRenderSlots<
+  | 'sidebar.workspaces.workspace.menu.item'
+  | 'sidebar.workspaces.workspace.detail'
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
   | 'sidebar.session.row.leading'
@@ -494,6 +496,7 @@ function SessionTree({
           }}
       >
         <ProjectRowItem
+          renderSlot={renderSlot}
           newShortcut={shortcuts.find(row => row.id === 'session.new')}
           group={group}
           containsCurrentDescendant={currentAncestors.has(group.key)}
@@ -525,6 +528,10 @@ function SessionTree({
               },
             }}
         />
+        {group.expanded && group.workspaceId !== undefined && group.cwd !== undefined
+          && renderSlot('sidebar.workspaces.workspace.detail', {
+            workspaceId: group.workspaceId, path: group.cwd, displayTitle: group.label,
+          })}
         {childRows.length > 0 && (
           <div role="group">
             {childRows}
@@ -854,6 +861,7 @@ export function WorkspaceBrowser({
   searchSessions,
   searchResultLimit,
   useDirectoryFlow,
+  useCreationActions,
   useHostInfo,
   useShortcuts,
   useWorkspaceShortcuts,
@@ -890,6 +898,11 @@ export function WorkspaceBrowser({
   // Live occupancy of this surface's directory-flow hole (the same source the
   // flow reads): a composition without a picking affordance can add nothing.
   const directoryFlowAvailable = useDirectoryFlow(occupied => occupied)
+  const hasCreationActions = useCreationActions(available => available)
+  const [creationMenuOpen, setCreationMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!hasCreationActions) setCreationMenuOpen(false)
+  }, [hasCreationActions])
   const groupBy = useStore(s => s.groupBy)
   const orderBy = useStore(s => s.orderBy)
   // Persisted view blobs written before the archived filter existed rehydrate
@@ -1281,24 +1294,36 @@ export function WorkspaceBrowser({
               t={t}
             />
           )}
-          {/* Adding is the button's one action, so a composition with no
-              picking affordance has nothing to offer here: the region hides the
-              button rather than leaving a dead one in the header. */}
-          {directoryFlowAvailable && (
-            <Tooltip label={t('workspace.add')} shortcutKeys={addShortcut?.keys} side="bottom" delayMs={500}>
-              <button
-                ref={wsPlusRef}
-                type="button"
-                className={css.iconButton}
-                aria-label={t('workspace.add')}
-                aria-keyshortcuts={addShortcut?.aria}
-                onClick={() => {
-                  requestAddWorkspace()
-                }}
-              >
-                <IconProjectAddOutlineRegular size={wide ? 16 : 18} />
-              </button>
-            </Tooltip>
+          {(directoryFlowAvailable || hasCreationActions) && (
+            <Menu
+              open={creationMenuOpen}
+              onClose={() => { setCreationMenuOpen(false) }}
+              portal
+              align="end"
+              anchor={(
+                <Tooltip label={t('workspace.add')} shortcutKeys={addShortcut?.keys} side="bottom" delayMs={500}>
+                  <button
+                    ref={wsPlusRef}
+                    type="button"
+                    className={css.iconButton}
+                    aria-label={t('workspace.add')}
+                    aria-keyshortcuts={addShortcut?.aria}
+                    onClick={() => {
+                      if (hasCreationActions) setCreationMenuOpen(value => !value)
+                      else requestAddWorkspace()
+                    }}
+                  >
+                    <IconProjectAddOutlineRegular size={wide ? 16 : 18} />
+                  </button>
+                </Tooltip>
+              )}
+            >
+              {renderSlot('sidebar.workspaces.create.action', {
+                onDismiss: () => { setCreationMenuOpen(false) },
+                onAddDirectory: requestAddWorkspace,
+                onCreated: startSession,
+              })}
+            </Menu>
           )}
         </div>
         {/* Add flow + its error dialog (same package — direct composition). */}

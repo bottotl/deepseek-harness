@@ -16,8 +16,8 @@
  * semantics (`createWorkspace({ path })`, the retryable error dialog,
  * Choose again); the occupant owns everything between `open` and the picked path,
  * including creating a new directory to hand back. That occupant-owned
- * creation is why adding a workspace has a single route: an unoccupied hole
- * leaves the surface with no add affordance at all.
+ * creation remains a directory-flow concern. The sidebar additionally exposes
+ * a creation-action list for independently owned creation workflows.
  * Two holes exist because the two menu surfaces are independent slot entries
  * and a hole has exactly one declaring entry — they carry the same owner
  * contract and the same occupant.
@@ -72,6 +72,32 @@ export interface DirectoryFlowOwnerProps {
   onError: (message: string) => void
 }
 
+/** Sidebar creation actions own their workflow and report only a registered Workspace. */
+export interface WorkspaceCreationOwnerProps {
+  /** Close the action menu before opening a plugin-owned overlay. */
+  onDismiss: () => void
+  /** Request the existing directory flow; available only while its provider is mounted. */
+  onAddDirectory: () => void
+  /** Open a Session in the committed Workspace; the contributor owns registration and readiness. */
+  onCreated: (workspaceId: WorkspaceId) => void
+}
+
+/** Identity and display data of one registered Workspace; no extension-owned metadata. */
+export interface WorkspaceDetailOwnerProps {
+  /** Registry identity, never an extension's project identity. */
+  workspaceId: WorkspaceId
+  /** Absolute directory supplied by the Workspace projection. */
+  path: string
+  /** Localized display title of the Workspace row. */
+  displayTitle: string
+}
+
+/** One Workspace menu occurrence. Contributions own their behavior and overlay state. */
+export interface WorkspaceMenuOwnerProps extends WorkspaceDetailOwnerProps {
+  /** Dismiss the menu before acting. */
+  onDismiss: () => void
+}
+
 /** Owner share of one Session row action occurrence: the row the action belongs to. */
 export interface SessionRowOwnerProps {
   /** Session the row shows. */
@@ -113,6 +139,12 @@ export interface SessionRowScheduleOwnerProps {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Sidebar creation menu; each contribution renders a localized menuitem button. */
+    'sidebar.workspaces.create.action': { kind: 'list'; scope: 'root'; owner: WorkspaceCreationOwnerProps }
+    /** Extra actions after Rename/Delete in a real Workspace row's menu. */
+    'sidebar.workspaces.workspace.menu.item': { kind: 'list'; scope: 'root'; owner: WorkspaceMenuOwnerProps }
+    /** Plugin-owned content below an expanded Workspace header; absent for Ungrouped and flat views. */
+    'sidebar.workspaces.workspace.detail': { kind: 'list'; scope: 'root'; owner: WorkspaceDetailOwnerProps }
     /** Directory-flow hole under the conversation empty-state picker (declared by the WorkspacePicker entry). */
     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
@@ -221,6 +253,8 @@ export type WorkspaceBrowserInjected = {
      * saw. Select the field the surface needs (`info => info.home`).
      */
     hostInfo: HostObservable<RemoteHostFacts>
+    /** True while an additional creation-action entry is registered. */
+    creationActions: HostObservable<boolean>
     workspaceShortcuts: HostObservable<WorkspaceShortcutState>
     shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
   }
@@ -455,6 +489,9 @@ export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
   & PropsRenderSlots<
     | 'sidebar.workspaces.directoryFlow'
+    | 'sidebar.workspaces.create.action'
+    | 'sidebar.workspaces.workspace.menu.item'
+    | 'sidebar.workspaces.workspace.detail'
     | 'sidebar.workspaces.session.menu.item'
     | 'sidebar.workspaces.session.row.action'
     | 'sidebar.session.row.leading'

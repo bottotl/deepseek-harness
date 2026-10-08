@@ -121,6 +121,9 @@ root
 │  ├─ sidebar.footer.action
 │  ├─ sidebar.workspaces
 │  │  ├─ sidebar.workspaces.directoryFlow
+│  │  ├─ sidebar.workspaces.create.action
+│  │  ├─ sidebar.workspaces.workspace.menu.item
+│  │  ├─ sidebar.workspaces.workspace.detail
 │  │  ├─ sidebar.workspaces.session.menu.item
 │  │  └─ sidebar.workspaces.session.row.action
 │  └─ sidebar.settings

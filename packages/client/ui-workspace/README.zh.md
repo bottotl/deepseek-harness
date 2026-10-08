@@ -11,7 +11,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包让用户浏览分组或扁平的 Session 列表、为新 Session 选择 Workspace，并通过添加、重命名、重排序、搜索、fork、归档和删除 Workspace 来管理 Workspace 与 Session；Session 行菜单及其悬停按钮是可由客户端插件扩展的 slot 列表。待处理交互显示为警告点，subagent 来源的 Session 则保持隐藏。处于空闲状态且未归档、其 Session 有活动定时任务的 Session 行会显示时钟标记，其悬浮卡片会列出这些任务。规范化后仍有差异的文件夹路径会保留为独立 Workspace。添加 Workspace 需要组合目录选择器；没有目录选择器时，添加操作不可用。
+本包让用户浏览分组或扁平的 Session 列表、为新 Session 选择 Workspace，并通过添加、重命名、重排序、搜索、fork、归档和删除 Workspace 来管理 Workspace 与 Session；Session 行菜单及其悬停按钮是可由客户端插件扩展的 slot 列表。待处理交互显示为警告点，subagent 来源的 Session 则保持隐藏。处于空闲状态且未归档、其 Session 有活动定时任务的 Session 行会显示时钟标记，其悬浮卡片会列出这些任务。规范化后仍有差异的文件夹路径会保留为独立 Workspace。目录接纳需要组合目录选择器；插件可独立提供其他创建操作。
 
 ## 目录
 
@@ -93,7 +93,14 @@ Workspace 和 Session 的启动基线均就绪后，空安装环境调用 `works
 
 ### 目录流子 slot
 
-每个注册各自声明一个**目录流子 slot**（`single` kind：`conversation.hero.workspace.directoryFlow`／`sidebar.workspaces.directoryFlow`），由组合的选择器包 client half 填入其选取交互——`-native` 后端的无渲染 OS 选择器驱动，`-browse` 组合下则是应用内浏览对话框。平铺显示的**添加工作区…** 操作仅在当前界面的 slot 被占用时渲染；slot 为空意味着该组合没有目录选择能力。本包持有触发与接纳：占用方通过 slot 的属主交互约定（`open`/`busy`/`onPicked`/`onCancel`/`onError`）每次打开上报一个所选路径，owner 通过对象层接纳它，并等待 Workspace 列表投影刷新后才选中已提交的 Workspace。
+每个注册各自声明一个**目录流子 slot**（`single` kind：`conversation.hero.workspace.directoryFlow`／`sidebar.workspaces.directoryFlow`），由组合的选择器包 client half 填入其选取交互——`-native` 后端的无渲染 OS 选择器驱动，`-browse` 组合下则是应用内浏览对话框。目录接纳操作仅在当前界面的 slot 被占用时渲染；slot 为空意味着该组合没有目录选择能力。本包持有触发与接纳：占用方通过 slot 的属主交互约定（`open`/`busy`/`onPicked`/`onCancel`/`onError`）每次打开上报一个所选路径，owner 通过对象层接纳它，并等待 Workspace 列表投影刷新后才选中已提交的 Workspace。
+
+<a id="workspace-extensions"></a>
+### Workspace 扩展
+
+侧栏声明三个 root scope 的列表：`sidebar.workspaces.create.action`、`sidebar.workspaces.workspace.menu.item` 和 `sidebar.workspaces.workspace.detail`。创建条目渲染 menuitem 按钮，接收 `onDismiss`、`onAddDirectory` 和 `onCreated(workspaceId)`。内置 `add-directory` 条目的顺序为 100，没有目录流提供者时隐藏。没有其他创建条目时，头部保留直接打开目录流的操作；有其他条目时切换为共享菜单，即使没有目录选择器也可用。创建插件负责表单、进度、错误、权限与持久操作状态，只上报已提交且就绪的 Workspace。打开插件自有的 `shell.overlay` 交互前应关闭菜单：菜单关闭时条目会卸载。
+
+Workspace 菜单贡献接在重命名、删除之后，接收 `workspaceId`、`path`、`displayTitle` 和 `onDismiss`。详情贡献在每个展开的 Workspace 头部下方接收同样的身份与显示数据。两类列表均不为 Ungrouped 渲染；详情也不在平铺或搜索视图渲染。属主不传递扩展元数据，也不查询工程。通过 `slots.inject` 使用插件命名空间内的 id 注册，移除和属主重新声明沿用现有 Slot Registry 生命周期。[Workspace 扩展决策](../../../.agents/notes/implemented/architecture/2026-10-08-workspace-ui-extension-slots.zh.md)记录所有权与验证。
 
 ### Session 行 action
 

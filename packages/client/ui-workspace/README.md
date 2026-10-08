@@ -11,7 +11,7 @@ Desktop product events use the optional [product analytics service](../product-a
 
 ## Summary
 
-This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion; the Session row menu and its hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions remain hidden. An idle, unarchived Session row with active scheduled tasks shows a clock mark, and its hover card lists those tasks. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, adding is unavailable.
+This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion; the Session row menu and its hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions remain hidden. An idle, unarchived Session row with active scheduled tasks shows a clock mark, and its hover card lists those tasks. Canonically distinct folder paths remain separate Workspaces. Directory adoption requires a composed directory picker; plugins may supply other creation actions independently.
 
 ## Table of Contents
 
@@ -93,7 +93,14 @@ Client callers can pass `prompt` and `clearPreviousDraft` in the second argument
 
 ### The directory-flow hole
 
-Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the `-native` backend's renderless OS-chooser driver, an in-app browsing dialog under a `-browse` composition. The flat **Add workspace...** action renders only while the surface's hole is occupied; an empty hole means the composition has no picking affordance. This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed.
+Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the `-native` backend's renderless OS-chooser driver, an in-app browsing dialog under a `-browse` composition. The directory-adoption action renders only while the surface's hole is occupied; an empty hole means the composition has no directory-picking affordance. This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed.
+
+<a id="workspace-extensions"></a>
+### Workspace extensions
+
+The sidebar declares three root-scoped lists: `sidebar.workspaces.create.action`, `sidebar.workspaces.workspace.menu.item`, and `sidebar.workspaces.workspace.detail`. Creation entries render menuitem buttons and receive `onDismiss`, `onAddDirectory`, and `onCreated(workspaceId)`. The shipped `add-directory` entry has order 100 and hides without a directory-flow provider. With no additional creation entry, the header keeps its direct directory-flow action; additional entries switch it to a shared menu even without a directory picker. Creation plugins own their forms, progress, errors, permissions and durable operation state, and report only a committed, ready Workspace. Close the menu before opening a plugin-owned `shell.overlay` interaction: menu entries unmount on dismissal.
+
+Workspace menu contributions follow Rename/Delete and receive `workspaceId`, `path`, `displayTitle`, and `onDismiss`. Detail contributions receive the same identity and display data below each expanded Workspace header. Neither list renders for Ungrouped; details do not render in the flat or search view. The owner supplies no extension metadata and performs no project lookup. Register with package-namespaced ids through `slots.inject`; removal and owner redeclaration follow the existing Slot Registry lifecycle. The [Workspace extension decision](../../../.agents/notes/implemented/architecture/2026-10-08-workspace-ui-extension-slots.md) records ownership and verification.
 
 ### Session row actions
 
